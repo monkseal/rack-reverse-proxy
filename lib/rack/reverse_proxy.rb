@@ -4,10 +4,11 @@ require "rack-proxy"
 require "rack/reverse_proxy_matcher"
 require "rack/exception"
 require "rack/reverse_proxy/http_streaming_response"
-
+require 'skylight'
 module Rack
   class ReverseProxy
     include NewRelic::Agent::Instrumentation::ControllerInstrumentation if defined? NewRelic
+    include Skylight::Helpers
 
     def initialize(app = nil, &b)
       @app = app || lambda {|env| [404, [], []] }
@@ -16,6 +17,7 @@ module Rack
       instance_eval(&b) if block_given?
     end
 
+    instrument_method title: 'ReverseProxy call'
     def call(env)
       rackreq = Rack::Request.new(env)
       matcher = get_matcher(rackreq.fullpath, Proxy.extract_http_request_headers(rackreq.env), rackreq)
@@ -33,6 +35,7 @@ module Rack
 
     private
 
+    instrument_method title: 'ReverseProxy proxy'
     def proxy(env, source_request, matcher)
       uri = matcher.get_uri(source_request.fullpath,env)
       if uri.nil?
